@@ -19,27 +19,31 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- PDF GENERATOR (2-Page Professional Report) ---
+
+# --- PDF GENERATOR (Restored Luxury Style + Full Schedule) ---
 def create_pdf(client_name, inputs, val_nom, val_real, inflation_loss, val_shield, schedule_df):
     class PDF(FPDF):
         def header(self):
-            # Header is only for Page 1 mainly, but we keep branding small on Page 2
-            if self.page_no() == 1:
-                self.set_draw_color(212, 175, 55)
-                self.set_line_width(1)
-                self.rect(5, 5, 200, 287)
-                self.set_line_width(0.3)
-                self.rect(7, 7, 196, 283)
-                self.set_fill_color(14, 17, 23)
-                self.rect(7, 7, 196, 33, 'F')
-                self.set_y(13)
-                self.set_font('Times', 'B', 24)
-                self.set_text_color(212, 175, 55)
-                self.cell(0, 10, 'COTTINGTON CAPITAL', 0, 1, 'C')
-                self.set_font('Times', 'I', 10)
-                self.set_text_color(255, 255, 255)
-                self.cell(0, 5, 'Wealth Architecture & Strategic Advisory', 0, 1, 'C')
-                self.ln(15)
+            # This header appears on EVERY page automatically
+            self.set_draw_color(212, 175, 55) # Gold
+            self.set_line_width(1)
+            self.rect(5, 5, 200, 287) # Outer Border
+            self.set_line_width(0.3)
+            self.rect(7, 7, 196, 283) # Inner Border
+            
+            # The Black Header Box
+            self.set_fill_color(14, 17, 23)
+            self.rect(7, 7, 196, 33, 'F')
+            
+            # Title
+            self.set_y(13)
+            self.set_font('Times', 'B', 24)
+            self.set_text_color(212, 175, 55)
+            self.cell(0, 10, 'COTTINGTON CAPITAL', 0, 1, 'C')
+            self.set_font('Times', 'I', 10)
+            self.set_text_color(255, 255, 255)
+            self.cell(0, 5, 'Wealth Architecture & Strategic Advisory', 0, 1, 'C')
+            self.ln(20) # Space after header
 
         def footer(self):
             self.set_y(-15)
@@ -48,11 +52,10 @@ def create_pdf(client_name, inputs, val_nom, val_real, inflation_loss, val_shiel
             self.cell(0, 10, f'CONFIDENTIAL - Page {self.page_no()}', 0, 0, 'C')
 
     pdf = PDF()
-    
-    # --- PAGE 1: EXECUTIVE SUMMARY ---
+    pdf.set_auto_page_break(auto=True, margin=25) # Smart page breaking
     pdf.add_page()
     
-    # Metadata
+    # 1. Metadata
     pdf.set_y(45)
     pdf.set_font('Arial', 'B', 9)
     pdf.set_text_color(0, 0, 0)
@@ -60,7 +63,7 @@ def create_pdf(client_name, inputs, val_nom, val_real, inflation_loss, val_shiel
     pdf.cell(0, 8, f"DATE: {datetime.now().strftime('%d %B %Y').upper()}", 0, 1, 'R')
     pdf.ln(2)
 
-    # Parameters
+    # 2. Parameters
     pdf.set_fill_color(212, 175, 55)
     pdf.set_font('Times', 'B', 12)
     pdf.cell(0, 6, '  1. CLIENT PARAMETERS', 0, 1, 'L', fill=True)
@@ -77,7 +80,7 @@ def create_pdf(client_name, inputs, val_nom, val_real, inflation_loss, val_shiel
         pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(5)
 
-    # Audit
+    # 3. Audit
     pdf.set_fill_color(212, 175, 55)
     pdf.set_font('Times', 'B', 12)
     pdf.set_text_color(0, 0, 0)
@@ -111,7 +114,7 @@ def create_pdf(client_name, inputs, val_nom, val_real, inflation_loss, val_shiel
     pdf.cell(0, 6, f"WARNING: Inflation is projected to erode R {inflation_loss:,.0f} of your purchasing power.", 0, 1, 'C')
     pdf.ln(6)
 
-    # Strategy
+    # 4. Strategy
     pdf.set_fill_color(14, 17, 23)
     pdf.set_text_color(212, 175, 55)
     pdf.set_font('Times', 'B', 12)
@@ -125,50 +128,44 @@ def create_pdf(client_name, inputs, val_nom, val_real, inflation_loss, val_shiel
     pdf.set_font('Times', 'B', 16)
     pdf.set_text_color(14, 17, 23)
     pdf.cell(0, 8, f"R {val_shield:,.0f}", 0, 1, 'C')
+    pdf.ln(4)
     
-    pdf.ln(10)
-    pdf.set_font('Arial', 'I', 8)
-    pdf.set_text_color(100, 100, 100)
-    pdf.cell(0, 5, "(See Page 2 for Full Contribution Schedule)", 0, 1, 'C')
+    # 5. The Full Schedule
+    pdf.set_font('Arial', 'B', 9)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 6, "Required Contribution Schedule (Full Term):", 0, 1, 'L')
+    
+    pdf.set_font('Arial', '', 8)
+    pdf.set_fill_color(245, 245, 245)
+    
+    # Table Header
+    pdf.set_font('Arial', 'B', 8)
+    pdf.cell(30, 6, "Year", 1, 0, 'C', fill=True)
+    pdf.cell(50, 6, "Required Premium", 1, 1, 'C', fill=True)
+    
+    pdf.set_font('Arial', '', 8)
+    
+    # Iterate through EVERY year in the dataframe
+    for index, row in schedule_df.iterrows():
+        # Check if we are at bottom of page, if so, add page (Header will auto-add)
+        if pdf.get_y() > 260:
+            pdf.add_page()
+            # Re-print table header on new page
+            pdf.set_font('Arial', 'B', 8)
+            pdf.cell(30, 6, "Year", 1, 0, 'C', fill=True)
+            pdf.cell(50, 6, "Required Premium", 1, 1, 'C', fill=True)
+            pdf.set_font('Arial', '', 8)
 
-    # Disclaimer (Bottom of Page 1)
-    pdf.set_y(-30)
+        pdf.cell(30, 6, f"Year {int(row['Year'])}", 1, 0, 'C')
+        pdf.cell(50, 6, f"R {row['Shielded Premium']:,.2f}", 1, 1, 'C')
+
+    # Disclaimer (Always at bottom of the current page)
+    pdf.ln(5)
     pdf.set_font('Arial', 'B', 6)
     pdf.set_text_color(150, 150, 150)
     pdf.cell(0, 4, "DISCLAIMER OF LIABILITY", 0, 1, 'L')
     pdf.set_font('Arial', '', 5)
     pdf.multi_cell(0, 3, "This document contains proprietary financial projections generated by Cottington Capital. 'Real Value' is calculated using the Fisher Equation to adjust for inflation. These figures are mathematical estimates based on the parameters provided and assume a constant rate of return. They do not account for tax implications or market volatility unless explicitly stated.")
-
-    # --- PAGE 2: FULL SCHEDULE ---
-    pdf.add_page()
-    
-    # Page 2 Header
-    pdf.set_font('Times', 'B', 14)
-    pdf.set_text_color(14, 17, 23)
-    pdf.cell(0, 10, 'APPENDIX: REQUIRED CONTRIBUTION SCHEDULE', 0, 1, 'L')
-    pdf.ln(5)
-    
-    # Table Header
-    pdf.set_font('Arial', 'B', 9)
-    pdf.set_fill_color(212, 175, 55)
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(30, 8, "Year", 1, 0, 'C', fill=True)
-    pdf.cell(50, 8, "Required Monthly Premium", 1, 1, 'C', fill=True)
-    
-    # Table Content (Full Loop)
-    pdf.set_font('Arial', '', 9)
-    pdf.set_fill_color(245, 245, 245)
-    
-    # Loop through EVERY year in the schedule
-    for index, row in schedule_df.iterrows():
-        # Clean up the output
-        year_val = int(row['Year'])
-        premium_val = f"R {row['Shielded Premium']:,.2f}"
-        
-        # Simple alternation for readability
-        fill = True if index % 2 == 0 else False
-        pdf.cell(30, 7, f"Year {year_val}", 1, 0, 'C', fill=fill)
-        pdf.cell(50, 7, premium_val, 1, 1, 'C', fill=fill)
 
     return pdf.output(dest='S').encode('latin-1')
 
