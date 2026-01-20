@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 from fpdf import FPDF
 from datetime import datetime
 
@@ -9,33 +10,43 @@ st.set_page_config(page_title="Cottington Capital", page_icon="🏛️", layout=
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; color: #d4af37; }
-    h1, h2, h3, h4, p, label { font-family: 'Times New Roman', serif; color: #d4af37 !important; }
+    h1, h2, h3, h4, p, label, .stTabs button { font-family: 'Times New Roman', serif; color: #d4af37 !important; }
     .stSelectbox > div > div { background-color: #1c1f26; color: #ffffff; }
     .stButton>button { color: #000000; background-color: #d4af37; border-radius: 5px; font-weight: bold; }
     .stTextInput > div > div > input { color: #ffffff; background-color: #1c1f26; }
     .stNumberInput > div > div > input { color: #ffffff; background-color: #1c1f26; }
     [data-testid="stMetricValue"] { color: #ffffff !important; font-family: 'Arial', sans-serif; }
-    div[data-testid="stTable"] { color: #ffffff; }
+    
+    .stTabs [data-baseweb="tab-list"] { gap: 24px; }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        white-space: pre-wrap;
+        background-color: #1c1f26;
+        border-radius: 4px 4px 0px 0px;
+        color: #ffffff;
+        font-weight: bold;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #d4af37;
+        color: #000000 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-
-# --- PDF GENERATOR (Restored Luxury Style + Full Schedule) ---
-def create_pdf(client_name, inputs, val_nom, val_real, inflation_loss, val_shield, schedule_df):
+# --- PDF GENERATOR ---
+def create_pdf(report_type, client_name, inputs, metrics, schedule_df, advice_text):
     class PDF(FPDF):
         def header(self):
-            # This header appears on EVERY page automatically
-            self.set_draw_color(212, 175, 55) # Gold
+            # Header
+            self.set_draw_color(212, 175, 55)
             self.set_line_width(1)
-            self.rect(5, 5, 200, 287) # Outer Border
+            self.rect(5, 5, 200, 287)
             self.set_line_width(0.3)
-            self.rect(7, 7, 196, 283) # Inner Border
+            self.rect(7, 7, 196, 283)
             
-            # The Black Header Box
             self.set_fill_color(14, 17, 23)
             self.rect(7, 7, 196, 33, 'F')
             
-            # Title
             self.set_y(13)
             self.set_font('Times', 'B', 24)
             self.set_text_color(212, 175, 55)
@@ -43,7 +54,7 @@ def create_pdf(client_name, inputs, val_nom, val_real, inflation_loss, val_shiel
             self.set_font('Times', 'I', 10)
             self.set_text_color(255, 255, 255)
             self.cell(0, 5, 'Wealth Architecture & Strategic Advisory', 0, 1, 'C')
-            self.ln(20) # Space after header
+            self.ln(15)
 
         def footer(self):
             self.set_y(-15)
@@ -52,7 +63,7 @@ def create_pdf(client_name, inputs, val_nom, val_real, inflation_loss, val_shiel
             self.cell(0, 10, f'CONFIDENTIAL - Page {self.page_no()}', 0, 0, 'C')
 
     pdf = PDF()
-    pdf.set_auto_page_break(auto=True, margin=25) # Smart page breaking
+    pdf.set_auto_page_break(auto=True, margin=25)
     pdf.add_page()
     
     # 1. Metadata
@@ -66,7 +77,7 @@ def create_pdf(client_name, inputs, val_nom, val_real, inflation_loss, val_shiel
     # 2. Parameters
     pdf.set_fill_color(212, 175, 55)
     pdf.set_font('Times', 'B', 12)
-    pdf.cell(0, 6, '  1. CLIENT PARAMETERS', 0, 1, 'L', fill=True)
+    pdf.cell(0, 6, f'  1. {report_type.upper()} PARAMETERS', 0, 1, 'L', fill=True)
     pdf.ln(3)
 
     pdf.set_font('Arial', '', 9)
@@ -80,97 +91,91 @@ def create_pdf(client_name, inputs, val_nom, val_real, inflation_loss, val_shiel
         pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(5)
 
-    # 3. Audit
+    # 3. Financial Analysis
     pdf.set_fill_color(212, 175, 55)
     pdf.set_font('Times', 'B', 12)
     pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 6, '  2. INFLATION IMPACT AUDIT', 0, 1, 'L', fill=True)
+    pdf.cell(0, 6, '  2. FINANCIAL ANALYSIS', 0, 1, 'L', fill=True)
     pdf.ln(4)
     
     pdf.set_font('Arial', 'B', 9)
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(95, 7, "METRIC", 1, 0, 'C', fill=True)
-    pdf.cell(95, 7, "PROJECTED VALUE", 1, 1, 'C', fill=True)
+    pdf.cell(95, 7, "VALUE", 1, 1, 'C', fill=True)
     
     pdf.set_font('Arial', '', 9)
-    pdf.cell(95, 8, "Nominal Value (Face Value)", 1, 0, 'L')
-    pdf.set_font('Arial', 'B', 9)
-    pdf.cell(95, 8, f"R {val_nom:,.0f}", 1, 1, 'R')
-    
-    pdf.set_font('Arial', '', 9)
-    pdf.cell(95, 8, "Real Buying Power (Today's Terms)", 1, 0, 'L')
-    pdf.set_font('Arial', 'B', 9)
-    pdf.set_text_color(200, 0, 0)
-    pdf.cell(95, 8, f"R {val_real:,.0f}", 1, 1, 'R')
-    pdf.set_text_color(0, 0, 0)
+    for label, value in metrics.items():
+        pdf.cell(95, 8, label, 1, 0, 'L')
+        pdf.set_font('Arial', 'B', 9)
+        if "Real" in label: pdf.set_text_color(150, 0, 0) # Highlight Real Value
+        else: pdf.set_text_color(0, 0, 0)
+        pdf.cell(95, 8, value, 1, 1, 'R')
+        pdf.set_font('Arial', '', 9)
+        pdf.set_text_color(0, 0, 0)
 
-    pdf.ln(4)
-    pdf.set_fill_color(255, 235, 235)
-    pdf.set_draw_color(200, 0, 0)
-    pdf.rect(10, pdf.get_y(), 190, 12, 'DF')
-    pdf.set_xy(12, pdf.get_y() + 3)
-    pdf.set_font('Arial', 'B', 8)
-    pdf.set_text_color(150, 0, 0)
-    pdf.cell(0, 6, f"WARNING: Inflation is projected to erode R {inflation_loss:,.0f} of your purchasing power.", 0, 1, 'C')
     pdf.ln(6)
 
     # 4. Strategy
     pdf.set_fill_color(14, 17, 23)
     pdf.set_text_color(212, 175, 55)
     pdf.set_font('Times', 'B', 12)
-    pdf.cell(0, 6, '  3. COTTINGTON RECOVERY STRATEGY', 0, 1, 'L', fill=True)
+    pdf.cell(0, 6, '  3. COTTINGTON ADVISORY VERDICT', 0, 1, 'L', fill=True)
     pdf.ln(4)
     
     pdf.set_text_color(0, 0, 0)
     pdf.set_font('Arial', '', 9)
-    pdf.multi_cell(0, 4, "To neutralize inflation, an 'Annual Escalation' strategy is recommended. By increasing contributions annually to match inflation, the projected Nominal Value increases to:")
-    pdf.ln(1)
-    pdf.set_font('Times', 'B', 16)
-    pdf.set_text_color(14, 17, 23)
-    pdf.cell(0, 8, f"R {val_shield:,.0f}", 0, 1, 'C')
+    pdf.multi_cell(0, 4, advice_text)
     pdf.ln(4)
     
-    # 5. The Full Schedule
+    # 5. Schedule
     pdf.set_font('Arial', 'B', 9)
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 6, "Required Contribution Schedule (Full Term):", 0, 1, 'L')
+    pdf.cell(0, 6, "Required Cash Flow Schedule (Full Term):", 0, 1, 'L')
     
     pdf.set_font('Arial', '', 8)
     pdf.set_fill_color(245, 245, 245)
     
-    # Table Header
     pdf.set_font('Arial', 'B', 8)
     pdf.cell(30, 6, "Year", 1, 0, 'C', fill=True)
-    pdf.cell(50, 6, "Required Premium", 1, 1, 'C', fill=True)
-    
+    pdf.cell(50, 6, "Required Premium", 1, 0, 'C', fill=True)
+    pdf.cell(50, 6, "Accumulated Balance", 1, 1, 'C', fill=True)
     pdf.set_font('Arial', '', 8)
     
-    # Iterate through EVERY year in the dataframe
     for index, row in schedule_df.iterrows():
-        # Check if we are at bottom of page, if so, add page (Header will auto-add)
         if pdf.get_y() > 260:
             pdf.add_page()
-            # Re-print table header on new page
             pdf.set_font('Arial', 'B', 8)
             pdf.cell(30, 6, "Year", 1, 0, 'C', fill=True)
-            pdf.cell(50, 6, "Required Premium", 1, 1, 'C', fill=True)
+            pdf.cell(50, 6, "Required Premium", 1, 0, 'C', fill=True)
+            pdf.cell(50, 6, "Accumulated Balance", 1, 1, 'C', fill=True)
             pdf.set_font('Arial', '', 8)
 
-        pdf.cell(30, 6, f"Year {int(row['Year'])}", 1, 0, 'C')
-        pdf.cell(50, 6, f"R {row['Shielded Premium']:,.2f}", 1, 1, 'C')
+        # Handle column names dynamically
+        yr = f"Year {int(row['Year'])}"
+        if 'Shielded Premium' in row:
+            prem = f"R {row['Shielded Premium']:,.2f}"
+            bal = f"R {row['Shielded Value (Smart Plan)']:,.2f}"
+        elif 'Escalating Premium' in row:
+             prem = f"R {row['Escalating Premium']:,.2f}"
+             bal = f"R {row['Projected Balance']:,.2f}"
+        else:
+             prem = "-"
+             bal = "-"
 
-    # Disclaimer (Always at bottom of the current page)
+        pdf.cell(30, 6, yr, 1, 0, 'C')
+        pdf.cell(50, 6, prem, 1, 0, 'C')
+        pdf.cell(50, 6, bal, 1, 1, 'C')
+
     pdf.ln(5)
     pdf.set_font('Arial', 'B', 6)
     pdf.set_text_color(150, 150, 150)
     pdf.cell(0, 4, "DISCLAIMER OF LIABILITY", 0, 1, 'L')
     pdf.set_font('Arial', '', 5)
-    pdf.multi_cell(0, 3, "This document contains proprietary financial projections generated by Cottington Capital. 'Real Value' is calculated using the Fisher Equation to adjust for inflation. These figures are mathematical estimates based on the parameters provided and assume a constant rate of return. They do not account for tax implications or market volatility unless explicitly stated.")
+    pdf.multi_cell(0, 3, "This document contains proprietary financial projections generated by Cottington Capital.")
 
     return pdf.output(dest='S').encode('latin-1')
 
-# --- ACTUARIAL LOGIC ---
-def calculate_scenarios(principal, contribution, rate, inflation, years, freq_option, timing_option):
+# --- LOGIC 1: WEALTH PROJECTOR ---
+def calculate_projection(principal, contribution, rate, inflation, years, freq_option, timing_option):
     freq_map = {"Monthly": 12, "Quarterly": 4, "Semi-Annually": 2, "Yearly": 1}
     m = freq_map[freq_option]
     total_periods = int(years * m)
@@ -215,85 +220,172 @@ def calculate_scenarios(principal, contribution, rate, inflation, years, freq_op
             
     return pd.DataFrame(data), bal_nom, bal_real_power, bal_shield
 
-# --- UI LOGIC ---
+# --- LOGIC 2: SMART GOAL SEEKER (Escalation Enabled) ---
+def calculate_smart_goal(target_amount, initial, rate, inflation, years, freq_option, timing_option):
+    freq_map = {"Monthly": 12, "Quarterly": 4, "Semi-Annually": 2, "Yearly": 1}
+    m = freq_map[freq_option]
+    total_periods = int(years * m)
+    r_per = (rate / 100) / m
+    
+    # 1. Real Value of Target (What is that target worth today?)
+    real_target_value = target_amount / ((1 + inflation/100)**years)
+
+    # 2. Future Value of Initial Lump Sum
+    fv_lump = initial * ((1 + r_per) ** total_periods)
+    remaining_goal = target_amount - fv_lump
+    
+    if remaining_goal <= 0:
+        return 0.0, 0.0, pd.DataFrame(), real_target_value # Goal Met
+
+    # 3. Solver: "Unit Test" Method for Escalating Annuity
+    # We simulate investing R1.00 starting premium with escalation
+    # Then we ratio up to the required goal.
+    
+    test_pmt = 1.0
+    test_balance = 0.0
+    
+    for period in range(1, total_periods + 1):
+        # Escalation logic on the unit test
+        if period > 1 and (period - 1) % m == 0:
+            test_pmt *= (1 + inflation / 100)
+            
+        if timing_option == "Start of Period (Advance)":
+            test_balance += test_pmt
+            test_balance += (test_balance * r_per)
+        else:
+            test_balance += (test_balance * r_per)
+            test_balance += test_pmt
+            
+    # The Multiplier
+    multiplier = remaining_goal / test_balance
+    
+    # 4. Generate Final Schedule
+    start_pmt = multiplier # The required starting premium
+    
+    data = []
+    balance = initial
+    curr_pmt = start_pmt
+    
+    for period in range(1, total_periods + 1):
+        if period > 1 and (period - 1) % m == 0:
+            curr_pmt *= (1 + inflation / 100)
+            
+        if timing_option == "Start of Period (Advance)":
+            balance += curr_pmt
+            balance += (balance * r_per)
+        else:
+            balance += (balance * r_per)
+            balance += curr_pmt
+            
+        if period % m == 0:
+            data.append({
+                "Year": period // m, 
+                "Escalating Premium": round(curr_pmt, 2),
+                "Projected Balance": round(balance, 2)
+            })
+            
+    return start_pmt, real_target_value, pd.DataFrame(data), real_target_value
+
+# --- MAIN UI ---
 st.title("🏛️ COTTINGTON CAPITAL")
-st.markdown("#### Strategic Wealth Advisory")
-st.write("---")
 
-# Use Number Input for Precision
-col1, col2 = st.columns(2)
-with col1:
-    initial_investment = st.number_input("Starting Capital (R)", value=0.0, step=1000.0)
-    contribution_amount = st.number_input("Monthly Contribution (R)", value=1000.0, step=100.0)
-with col2:
-    # PRECISION CHANGE: number_input instead of slider
-    interest_rate = st.number_input("Market Return (%)", value=10.0, step=0.1, format="%.2f")
-    inflation_rate = st.number_input("Inflation / CPI (%)", value=6.0, step=0.1, format="%.2f")
+tab1, tab2 = st.tabs(["Wealth Projector (Forward)", "Goal Seeker (Reverse)"])
 
-col3, col4 = st.columns(2)
-with col3:
-    time_horizon = st.number_input("Duration (Years)", value=10, step=1)
-    frequency = st.selectbox("Frequency", ("Monthly", "Quarterly", "Semi-Annually", "Yearly"))
-with col4:
-    timing = st.selectbox("Timing", ("Start of Period (Advance)", "End of Period (Arrears)"))
-
-st.write("---")
-
-# BUTTON ACTION
-if st.button("Initialize Reality Check"):
-    df, val_nom, val_real, val_shield = calculate_scenarios(
-        initial_investment, contribution_amount, interest_rate, 
-        inflation_rate, time_horizon, frequency, timing
-    )
-    st.session_state['results'] = {
-        'df': df,
-        'val_nom': val_nom,
-        'val_real': val_real,
-        'val_shield': val_shield,
-        'loss': val_nom - val_real
-    }
-
-# CHECK SESSION STATE
-if 'results' in st.session_state:
-    res = st.session_state['results']
+# --- TAB 1 ---
+with tab1:
+    st.markdown("#### The Inflation Shield Projector")
+    st.write("---")
     
-    st.subheader("The Reality of Inflation")
-    m1, m2, m3 = st.columns(3)
-    with m1: st.metric("Nominal Value (Face Value)", f"R {res['val_nom']:,.0f}")
-    with m2: st.metric("Real Buying Power", f"R {res['val_real']:,.0f}", delta_color="off")
-    with m3: st.metric("Loss Due to Inflation", f"- R {res['loss']:,.0f}", delta_color="inverse")
+    col1, col2 = st.columns(2)
+    with col1:
+        p_initial = st.number_input("Starting Capital (R)", value=0.0, step=1000.0, key="p1")
+        p_contrib = st.number_input("Monthly Contribution (R)", value=1000.0, step=100.0, key="p2")
+    with col2:
+        p_rate = st.number_input("Market Return (%)", value=10.0, step=0.1, format="%.2f", key="p3")
+        p_inf = st.number_input("Inflation / CPI (%)", value=6.0, step=0.1, format="%.2f", key="p4")
 
-    st.line_chart(res['df'], x="Year", y=["Nominal Value (Bank Balance)", "Real Buying Power"], color=["#d4af37", "#ff4b4b"])
+    col3, col4 = st.columns(2)
+    with col3:
+        p_years = st.number_input("Duration (Years)", value=10, step=1, key="p5")
+        p_freq = st.selectbox("Frequency", ("Monthly", "Quarterly", "Semi-Annually", "Yearly"), key="p6")
+    with col4:
+        p_time = st.selectbox("Timing", ("Start of Period (Advance)", "End of Period (Arrears)"), key="p7")
 
     st.write("---")
-    st.subheader("🛡️ The Cottington Solution")
-    st.info(f"""
-    **STRATEGIC ADVICE:** To stop this loss of buying power, you must increase your contribution by **{inflation_rate}% annually**.
-    **Outcome if you switch to the Smart Plan:** R {res['val_shield']:,.0f}
-    """)
-    
-    with st.expander("View Full Payment Schedule"):
-        st.dataframe(res['df'][["Year", "Shielded Premium"]].set_index("Year"))
+    if st.button("Run Projection"):
+        df, v_nom, v_real, v_shield = calculate_projection(p_initial, p_contrib, p_rate, p_inf, p_years, p_freq, p_time)
+        st.session_state['proj_res'] = {'df': df, 'v_nom': v_nom, 'v_real': v_real, 'v_shield': v_shield, 'loss': v_nom - v_real}
 
-    # PDF SECTION
+    if 'proj_res' in st.session_state:
+        res = st.session_state['proj_res']
+        m1, m2, m3 = st.columns(3)
+        with m1: st.metric("Nominal Value", f"R {res['v_nom']:,.0f}")
+        with m2: st.metric("Real Buying Power", f"R {res['v_real']:,.0f}")
+        with m3: st.metric("Inflation Loss", f"- R {res['loss']:,.0f}", delta_color="inverse")
+        
+        st.line_chart(res['df'], x="Year", y=["Nominal Value (Bank Balance)", "Real Buying Power"], color=["#d4af37", "#ff4b4b"])
+        
+        st.subheader("📄 Report Generator")
+        c_name = st.text_input("Client Name", "Valued Client", key="c_name_1")
+        
+        inputs_1 = {"Initial Investment": f"R {p_initial:,.2f}", "Contribution": f"R {p_contrib:,.2f}", "Return": f"{p_rate}%", "Inflation": f"{p_inf}%", "Duration": f"{p_years} Years"}
+        metrics_1 = {"Nominal Value": f"R {res['v_nom']:,.2f}", "Real Buying Power": f"R {res['v_real']:,.2f}", "Inflation Loss": f"- R {res['loss']:,.2f}", "Potential with Shield": f"R {res['v_shield']:,.2f}"}
+        advice_1 = f"To neutralize inflation, an 'Annual Escalation' strategy is recommended. By increasing contributions annually to match inflation ({p_inf}%), the projected Nominal Value increases to R {res['v_shield']:,.0f}."
+        
+        if st.button("Download Projection Report"):
+            pdf_bytes = create_pdf("Wealth Projection", c_name, inputs_1, metrics_1, res['df'], advice_1)
+            st.download_button("📥 Download PDF", pdf_bytes, f"Cottington_Projection_{c_name}.pdf", "application/pdf")
+
+# --- TAB 2: SMART GOAL SEEKER ---
+with tab2:
+    st.markdown("#### The Target Architect (Escalation Enabled)")
     st.write("---")
-    st.subheader("📄 Client Report Generator")
     
-    client_name = st.text_input("Enter Client Name for Report", "Valued Client")
+    col1, col2 = st.columns(2)
+    with col1:
+        g_target = st.number_input("Target Wealth Amount (R)", value=1000000.0, step=10000.0, key="g1")
+        g_initial = st.number_input("Existing Capital (R)", value=0.0, step=1000.0, key="g2")
+    with col2:
+        g_rate = st.number_input("Expected Return (%)", value=10.0, step=0.1, key="g3")
+        g_inf = st.number_input("Escalation / Inflation (%)", value=6.0, step=0.1, key="g_inf") # NEW
+
+    col3, col4 = st.columns(2)
+    with col3:
+        g_years = st.number_input("Time to Goal (Years)", value=10, step=1, key="g4")
+        g_freq = st.selectbox("Contribution Frequency", ("Monthly", "Quarterly", "Semi-Annually", "Yearly"), key="g5")
+    with col4:
+        g_time = st.selectbox("Payment Timing", ("Start of Period (Advance)", "End of Period (Arrears)"), key="g6")
+
+    st.write("---")
     
-    input_data = {
-        "Initial Investment": f"R {initial_investment:,.2f}",
-        "Contribution": f"R {contribution_amount:,.2f} ({frequency})",
-        "Annual Return (Rate)": f"{interest_rate}%",
-        "Inflation (CPI)": f"{inflation_rate}%",
-        "Duration": f"{time_horizon} Years"
-    }
-    
-    pdf_bytes = create_pdf(client_name, input_data, res['val_nom'], res['val_real'], res['loss'], res['val_shield'], res['df'])
-    
-    st.download_button(
-        label="📥 Download Cottington Report",
-        data=pdf_bytes,
-        file_name=f"Cottington_Report_{client_name.replace(' ', '_')}.pdf",
-        mime="application/pdf"
-    )
+    if st.button("Calculate Smart Premium"):
+        start_pmt, real_target, g_df, real_val = calculate_smart_goal(g_target, g_initial, g_rate, g_inf, g_years, g_freq, g_time)
+        st.session_state['goal_res'] = {'pmt': start_pmt, 'df': g_df, 'real_target': real_target}
+
+    if 'goal_res' in st.session_state:
+        gres = st.session_state['goal_res']
+        
+        # 1. The Real Value Warning
+        st.info(f"💡 **REALITY CHECK:** Your goal of **R {g_target:,.0f}** will only have the purchasing power of **R {gres['real_target']:,.0f}** in today's money due to inflation.")
+        
+        st.subheader("Required Action Plan")
+        st.metric(label=f"Starting {g_freq} Contribution", value=f"R {gres['pmt']:,.2f}")
+        st.caption(f"Note: This premium will increase by {g_inf}% every year to keep it affordable at the start.")
+        
+        st.line_chart(gres['df'], x="Year", y="Projected Balance", color="#d4af37")
+
+        # Goal Report
+        st.subheader("📄 Report Generator")
+        c_name_2 = st.text_input("Client Name", "Valued Client", key="c_name_2")
+        
+        inputs_2 = {"Target Goal": f"R {g_target:,.2f}", "Existing Capital": f"R {g_initial:,.2f}", "Return": f"{g_rate}%", "Escalation": f"{g_inf}%", "Time Horizon": f"{g_years} Years"}
+        metrics_2 = {
+            "STARTING PREMIUM": f"R {gres['pmt']:,.2f}",
+            "Target Nominal Value": f"R {g_target:,.2f}",
+            "Target Real Value": f"R {gres['real_target']:,.2f} (Buying Power)"
+        }
+        advice_2 = f"To achieve the target capital of R {g_target:,.0f} within {g_years} years, we recommend a 'Smart Start' strategy. You begin with a contribution of R {gres['pmt']:,.2f}, which increases by {g_inf}% annually. This reduces your upfront burden while ensuring the goal is met."
+        
+        if st.button("Download Goal Strategy"):
+            pdf_bytes_2 = create_pdf("Goal Seek", c_name_2, inputs_2, metrics_2, gres['df'], advice_2)
+            st.download_button("📥 Download PDF", pdf_bytes_2, f"Cottington_Goal_{c_name_2}.pdf", "application/pdf")
