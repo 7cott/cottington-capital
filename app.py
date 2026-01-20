@@ -13,48 +13,60 @@ st.markdown("""
     .stApp { background-color: #0e1117; color: #d4af37; }
     
     /* 2. Text Styling */
-    h1, h2, h3, h4, p, label, .stTabs button { font-family: 'Times New Roman', serif; color: #d4af37 !important; }
+    h1, h2, h3, h4, p, label { font-family: 'Times New Roman', serif; color: #d4af37 !important; }
     .stSelectbox > div > div { background-color: #1c1f26; color: #ffffff; }
     .stTextInput > div > div > input { color: #ffffff; background-color: #1c1f26; }
     .stNumberInput > div > div > input { color: #ffffff; background-color: #1c1f26; }
     [data-testid="stMetricValue"] { color: #ffffff !important; font-family: 'Arial', sans-serif; }
     
-    /* 3. BUTTON STYLING (FIXED HOVER) */
-    .stButton>button {
-        color: #000000 !important; /* Force Black Text */
+    /* 3. BUTTON STYLING (FORCE BLACK TEXT) */
+    .stButton > button {
+        color: #000000 !important; /* Black Text Always */
         background-color: #d4af37 !important; /* Gold Background */
         border-radius: 5px;
         font-weight: bold;
         border: none;
     }
-    .stButton>button:hover {
-        background-color: #bfa345 !important; /* Slightly Darker Gold on Hover */
-        color: #000000 !important; /* TEXT STAYS BLACK */
+    .stButton > button:hover {
+        background-color: #bfa345 !important;
+        color: #000000 !important;
         border: 1px solid #ffffff;
     }
-    .stButton>button:active {
+    .stButton > button:focus {
         color: #000000 !important;
         background-color: #d4af37 !important;
     }
-    
-    /* 4. TAB STYLING (FIXED VISIBILITY) */
+    /* Force internal text of buttons to be black if Streamlit overrides p tags */
+    .stButton > button p {
+        color: #000000 !important;
+    }
+
+    /* 4. TAB STYLING (HIGH CONTRAST) */
     .stTabs [data-baseweb="tab-list"] { gap: 24px; }
+    
+    /* Inactive Tab */
     .stTabs [data-baseweb="tab"] {
         height: 50px;
         white-space: pre-wrap;
         background-color: #1c1f26;
         border-radius: 4px 4px 0px 0px;
-        color: #ffffff; /* Default Text White */
+        color: #ffffff !important; /* White text on Dark */
         font-weight: bold;
     }
+    
+    /* Active Tab (The One Selected) */
     .stTabs [aria-selected="true"] {
-        background-color: #d4af37 !important;
-        color: #000000 !important; /* Active Text Black */
+        background-color: #d4af37 !important; /* Gold Background */
+        color: #000000 !important; /* Black Text */
+    }
+    /* Fix for text inside active tabs */
+    .stTabs [aria-selected="true"] p {
+        color: #000000 !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- PDF GENERATOR (NUCLEAR DISCLAIMER) ---
+# --- PDF GENERATOR (PROFESSIONAL DISCLAIMER) ---
 def create_pdf(report_type, client_name, inputs, metrics, schedule_df, advice_text):
     class PDF(FPDF):
         def header(self):
@@ -185,7 +197,7 @@ def create_pdf(report_type, client_name, inputs, metrics, schedule_df, advice_te
         pdf.cell(50, 6, prem, 1, 0, 'C')
         pdf.cell(50, 6, bal, 1, 1, 'C')
 
-    # THE NUCLEAR DISCLAIMER (Updated)
+    # THE PROFESSIONAL DISCLAIMER
     pdf.ln(5)
     pdf.set_font('Arial', 'B', 6)
     pdf.set_text_color(150, 150, 150)
@@ -193,13 +205,13 @@ def create_pdf(report_type, client_name, inputs, metrics, schedule_df, advice_te
     pdf.set_font('Arial', '', 5)
     
     disclaimer_text = (
-        "1. NO FINANCIAL ADVICE: This report is generated for educational and illustrative purposes only. Cottington Capital is not a registered Financial Services Provider (FSP) "
+        "1. STRATEGIC TOOL ONLY: This report serves as a quantitative decision-support tool for strategic planning. Cottington Capital is not a registered Financial Services Provider (FSP) "
         "and does not provide personalized investment, tax, or legal advice. "
-        "2. HYPOTHETICAL PROJECTIONS: All figures are mathematical projections based on user-provided inputs and constant rates of return. Actual market returns vary and past performance "
-        "is not indicative of future results. 'Real Value' is an estimation using the Fisher Equation. "
-        "3. LIMITATION OF LIABILITY: By using this report, you acknowledge that Cottington Capital, its developers, and affiliates shall not be liable for any direct, indirect, incidental, "
-        "or consequential damages resulting from the use of this data. You assume full responsibility for any financial decisions made. "
-        "4. INDEPENDENT VERIFICATION: You are strongly advised to consult with a qualified financial advisor or actuary before making investment decisions."
+        "2. PROJECTION METHODOLOGY: All figures are mathematical projections based on user-provided inputs and constant rates of return. Actual market returns vary. "
+        "'Real Value' is estimated using the Fisher Equation. "
+        "3. LIMITATION OF LIABILITY: By using this report, you acknowledge that Cottington Capital shall not be liable for any direct or consequential damages "
+        "resulting from the use of this data. You assume full responsibility for any financial decisions made. "
+        "4. PROFESSIONAL CONSULTATION: You are strongly advised to consult with a qualified actuary or financial advisor before making investment decisions."
     )
     
     pdf.multi_cell(0, 3, disclaimer_text)
