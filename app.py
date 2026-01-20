@@ -63,6 +63,19 @@ st.markdown("""
     .stTabs [aria-selected="true"] p {
         color: #000000 !important;
     }
+    /* 5. ICONIC ADVISORY CARD */
+    .stAlert {
+        background-color: #1c1f26 !important;
+        border: 2px solid #d4af37 !important;
+        border-left: 10px solid #d4af37 !important; /* Thick Gold Bar on left */
+        color: #ffffff !important;
+        font-family: 'Times New Roman', serif;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    /* Make the icon inside the alert Gold */
+    .stAlert [data-testid="stMarkdownContainer"] > p {
+        font-size: 1.1em;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -398,7 +411,7 @@ with tab2:
     if 'goal_res' in st.session_state:
         gres = st.session_state['goal_res']
         
-        st.info(f"💡 **REALITY CHECK:** Your goal of **R {g_target:,.0f}** will only have the purchasing power of **R {gres['real_target']:,.0f}** in today's money due to inflation.")
+        st.info(f"🏛️ **OFFICIAL COTTINGTON VERDICT:** \n\nYour goal of **R {g_target:,.0f}** will only have the purchasing power of **R {gres['real_target']:,.0f}** in today's money.\n\n**STRATEGIC INPUT:** You must increase contributions to bridge this gap.")
         
         st.subheader("Required Action Plan")
         st.metric(label=f"Starting {g_freq} Contribution", value=f"R {gres['pmt']:,.2f}")
@@ -420,3 +433,4 @@ with tab2:
         if st.button("Download Goal Strategy"):
             pdf_bytes_2 = create_pdf("Goal Seek", c_name_2, inputs_2, metrics_2, gres['df'], advice_2)
             st.download_button("📥 Download PDF", pdf_bytes_2, f"Cottington_Goal_{c_name_2}.pdf", "application/pdf")
+
